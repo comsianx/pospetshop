@@ -168,15 +168,15 @@
       <p>POS & Inventory Management System</p>
       <form onsubmit="handleLogin(event)">
         <div class="login-field">
-          <label for="usernameInput">Username</label>
-          <input type="text" id="usernameInput" placeholder="Enter username" required autocomplete="off">
+          <label for="usernameInput">Email Address</label>
+          <input type="email" id="usernameInput" placeholder="Enter email address" required autocomplete="off">
         </div>
         <div class="login-field">
           <label for="passwordInput">Password</label>
           <input type="password" id="passwordInput" placeholder="Enter password" required autocomplete="off">
         </div>
         <button type="submit" class="btn-login">Sign In</button>
-        <div id="loginError" class="login-error">Invalid username or password.</div>
+        <div id="loginError" class="login-error">Invalid email or password.</div>
       </form>
     </div>
   </div>
@@ -559,6 +559,12 @@
       query, 
       orderBy 
     } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { 
+      getAuth, 
+      signInWithEmailAndPassword, 
+      signOut, 
+      onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     // Firebase Configuration Settings
     const firebaseConfig = {
@@ -570,12 +576,10 @@
       appId: "1:303343617585:web:6179edd9e806fa5520b710"
     };
 
-    // Initialize Firebase & Firestore
+    // Initialize Firebase, Firestore, and Auth
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-
-    const DEFAULT_USER = 'admin';
-    const DEFAULT_PASS = 'admin123';
+    const auth = getAuth(app);
 
     let inventory = [];
     let salesLog = [];
@@ -621,6 +625,22 @@
     window.addProduct = addProduct;
     window.exportInventoryExcel = exportInventoryExcel;
 
+    // Listen for authentication state changes automatically
+    onAuthStateChanged(auth, (user) => {
+      const loginModal = document.getElementById('loginModal');
+      const errBox = document.getElementById('loginError');
+      
+      if (user) {
+        loginModal.style.display = 'none';
+        errBox.style.display = 'none';
+        loadDataFromFirebase().then(() => {
+          updateDashboard();
+        });
+      } else {
+        loginModal.style.display = 'flex';
+      }
+    });
+
     // Load Data from Firebase Firestore on Startup
     async function loadDataFromFirebase() {
       try {
@@ -647,27 +667,30 @@
       }
     }
 
-    function handleLogin(e) {
+    async function handleLogin(e) {
       e.preventDefault();
-      const user = document.getElementById('usernameInput').value.trim();
+      const email = document.getElementById('usernameInput').value.trim();
       const pass = document.getElementById('passwordInput').value.trim();
       const errBox = document.getElementById('loginError');
 
-      if (user === DEFAULT_USER && pass === DEFAULT_PASS) {
-        document.getElementById('loginModal').style.display = 'none';
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
         errBox.style.display = 'none';
-        loadDataFromFirebase().then(() => {
-          updateDashboard();
-        });
-      } else {
+      } catch (error) {
+        console.error("Login failed:", error.message);
         errBox.style.display = 'block';
+        errBox.innerText = "Invalid email or password.";
       }
     }
 
-    function handleLogout() {
-      document.getElementById('usernameInput').value = '';
-      document.getElementById('passwordInput').value = '';
-      document.getElementById('loginModal').style.display = 'flex';
+    async function handleLogout() {
+      try {
+        await signOut(auth);
+        document.getElementById('usernameInput').value = '';
+        document.getElementById('passwordInput').value = '';
+      } catch (error) {
+        console.error("Logout failed:", error.message);
+      }
     }
 
     function switchPage(pageId, event) {
