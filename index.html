@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -94,6 +95,15 @@
     .filter-bar input, .filter-bar select, .filter-bar button { padding: 9px 12px; border: 1px solid var(--border); border-radius: 5px; outline: none; font-size: 0.9rem; }
     .filter-bar button { background: var(--primary); color: white; border: none; cursor: pointer; font-weight: 600; transition: background 0.2s; }
     .filter-bar button:hover { background: var(--primary-light); }
+
+    /* Pagination Bar Control Styling */
+    .pagination-bar { display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); padding: 12px 15px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); margin-bottom: 20px; font-size: 0.88rem; }
+    .pagination-bar select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 5px; outline: none; background: #fff; font-weight: 600; }
+    .pagination-controls { display: flex; gap: 5px; align-items: center; }
+    .pagination-controls button { background: #fff; border: 1px solid var(--border); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: 600; color: var(--text-dark); }
+    .pagination-controls button:hover:not(:disabled) { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .pagination-controls button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .pagination-info { color: var(--text-muted); font-weight: 500; }
 
     /* Excel Export Button Styling */
     .btn-export-excel { background: #1f7244 !important; color: white; border: none; cursor: pointer; font-weight: 600; }
@@ -425,18 +435,35 @@
       </div>
 
       <div class="filter-bar">
-        <input type="text" id="logSearchInput" placeholder="Search Invoice ID, Customer, or Product..." style="flex:2; min-width: 200px;" onkeyup="renderSalesLog()">
+        <input type="text" id="logSearchInput" placeholder="Search Invoice ID, Customer, or Product..." style="flex:2; min-width: 200px;" onkeyup="handleSalesLogSearch()">
         <div style="display: flex; align-items: center; gap: 5px; font-size: 0.85rem;">
           <label style="font-weight: 600; color: var(--text-muted);">From:</label>
-          <input type="date" id="logStartDate" onchange="renderSalesLog()">
+          <input type="date" id="logStartDate" onchange="handleSalesLogSearch()">
         </div>
         <div style="display: flex; align-items: center; gap: 5px; font-size: 0.85rem;">
           <label style="font-weight: 600; color: var(--text-muted);">To:</label>
-          <input type="date" id="logEndDate" onchange="renderSalesLog()">
+          <input type="date" id="logEndDate" onchange="handleSalesLogSearch()">
         </div>
-        <button onclick="renderSalesLog()">Search Log</button>
+        <button onclick="handleSalesLogSearch()">Search Log</button>
         <button onclick="clearDateFilter()" style="background: #6c757d;">Clear Dates</button>
         <button onclick="exportSalesLogExcel()" class="btn-export-excel">📥 Export Excel</button>
+      </div>
+
+      <!-- Pagination Top Bar -->
+      <div class="pagination-bar">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label for="salesLogEntriesPerPage" style="font-weight: 600; color: var(--text-muted);">Show</label>
+          <select id="salesLogEntriesPerPage" onchange="changeSalesLogLimit()">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="all">All</option>
+          </select>
+          <span style="color: var(--text-muted);">entries</span>
+        </div>
+        <div class="pagination-info" id="salesLogInfo">Showing 0 to 0 of 0 entries</div>
+        <div class="pagination-controls" id="salesLogPaginationControls"></div>
       </div>
 
       <div class="table-container">
@@ -491,6 +518,23 @@
         <input type="number" step="0.01" id="addStock" placeholder="+ Add Qty" style="width:100px;">
         <button onclick="addProduct()">+ Save Stock</button>
         <button onclick="exportInventoryExcel()" class="btn-export-excel">📥 Export Excel</button>
+      </div>
+
+      <!-- Pagination Top Bar -->
+      <div class="pagination-bar">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label for="inventoryEntriesPerPage" style="font-weight: 600; color: var(--text-muted);">Show</label>
+          <select id="inventoryEntriesPerPage" onchange="changeInventoryLimit()">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="all">All</option>
+          </select>
+          <span style="color: var(--text-muted);">entries</span>
+        </div>
+        <div class="pagination-info" id="inventoryInfo">Showing 0 to 0 of 0 entries</div>
+        <div class="pagination-controls" id="inventoryPaginationControls"></div>
       </div>
 
       <div class="table-container">
@@ -587,6 +631,10 @@
     let lastCompletedInvoice = null;
     let activeCategory = null;
 
+    // Pagination State Trackers
+    let salesLogCurrentPage = 1;
+    let inventoryCurrentPage = 1;
+
     // Icons map for categories
     const categoryIcons = {
       'Accessories': '🎒',
@@ -615,10 +663,15 @@
     window.printInvoice = printInvoice;
     window.printSingleLogInvoice = printSingleLogInvoice;
     window.renderSalesLog = renderSalesLog;
+    window.handleSalesLogSearch = handleSalesLogSearch;
+    window.changeSalesLogLimit = changeSalesLogLimit;
+    window.changeSalesLogPage = changeSalesLogPage;
     window.clearDateFilter = clearDateFilter;
     window.exportSalesLogExcel = exportSalesLogExcel;
     window.autofillProductDetails = autofillProductDetails;
     window.renderInventory = renderInventory;
+    window.changeInventoryLimit = changeInventoryLimit;
+    window.changeInventoryPage = changeInventoryPage;
     window.openEditInventoryModal = openEditInventoryModal;
     window.closeEditInventoryModal = closeEditInventoryModal;
     window.saveEditedProduct = saveEditedProduct;
@@ -1080,10 +1133,65 @@
       });
     }
 
+    function handleSalesLogSearch() {
+      salesLogCurrentPage = 1;
+      renderSalesLog();
+    }
+
+    function changeSalesLogLimit() {
+      salesLogCurrentPage = 1;
+      renderSalesLog();
+    }
+
+    function changeSalesLogPage(page) {
+      salesLogCurrentPage = page;
+      renderSalesLog();
+    }
+
     function renderSalesLog() {
       const body = document.getElementById('salesLogTableBody');
       const filtered = getFilteredSalesLog();
-      body.innerHTML = filtered.map(s => `
+      const limitVal = document.getElementById('salesLogEntriesPerPage').value;
+      
+      let paginatedData = [];
+      let totalPages = 1;
+
+      if (limitVal === 'all') {
+        paginatedData = filtered;
+      } else {
+        const limit = parseInt(limitVal, 10);
+        totalPages = Math.ceil(filtered.length / limit) || 1;
+        if (salesLogCurrentPage > totalPages) salesLogCurrentPage = totalPages;
+        if (salesLogCurrentPage < 1) salesLogCurrentPage = 1;
+        
+        const start = (salesLogCurrentPage - 1) * limit;
+        paginatedData = filtered.slice(start, start + limit);
+      }
+
+      // Update Info Text
+      const infoText = filtered.length === 0 ? 'Showing 0 to 0 of 0 entries' : 
+        limitVal === 'all' ? `Showing 1 to ${filtered.length} of ${filtered.length} entries` :
+        `Showing ${((salesLogCurrentPage - 1) * parseInt(limitVal)) + 1} to ${Math.min(salesLogCurrentPage * parseInt(limitVal), filtered.length)} of ${filtered.length} entries`;
+      document.getElementById('salesLogInfo').innerText = infoText;
+
+      // Render Pagination Buttons
+      const controlsDiv = document.getElementById('salesLogPaginationControls');
+      if (limitVal === 'all' || totalPages <= 1) {
+        controlsDiv.innerHTML = '';
+      } else {
+        let controlsHtml = `<button onclick="changeSalesLogPage(${salesLogCurrentPage - 1})" ${salesLogCurrentPage === 1 ? 'disabled' : ''}>Prev</button>`;
+        for (let i = 1; i <= totalPages; i++) {
+          if (i === 1 || i === totalPages || (i >= salesLogCurrentPage - 1 && i <= salesLogCurrentPage + 1)) {
+            controlsHtml += `<button onclick="changeSalesLogPage(${i})" ${salesLogCurrentPage === i ? 'style="background:var(--primary);color:#fff;border-color:var(--primary);"' : ''}>${i}</button>`;
+          } else if (i === salesLogCurrentPage - 2 || i === salesLogCurrentPage + 2) {
+            controlsHtml += `<span>...</span>`;
+          }
+        }
+        controlsHtml += `<button onclick="changeSalesLogPage(${salesLogCurrentPage + 1})" ${salesLogCurrentPage === totalPages ? 'disabled' : ''}>Next</button>`;
+        controlsDiv.innerHTML = controlsHtml;
+      }
+
+      body.innerHTML = paginatedData.map(s => `
         <tr>
           <td><button class="btn-print-row" onclick="printSingleLogInvoice('${s.invoiceId}')">🖨️ Print</button></td>
           <td><strong>${s.invoiceId}</strong></td>
@@ -1104,7 +1212,7 @@
     function clearDateFilter() {
       document.getElementById('logStartDate').value = '';
       document.getElementById('logEndDate').value = '';
-      renderSalesLog();
+      handleSalesLogSearch();
     }
 
     function exportSalesLogExcel() {
@@ -1142,14 +1250,65 @@
       datalist.innerHTML = inventory.map(item => `<option value="${item.name}">${item.variant}</option>`).join('');
     }
 
+    function changeInventoryLimit() {
+      inventoryCurrentPage = 1;
+      renderInventory();
+    }
+
+    function changeInventoryPage(page) {
+      inventoryCurrentPage = page;
+      renderInventory();
+    }
+
     function renderInventory() {
       populateDatalist();
       const body = document.getElementById('inventoryTableBody');
+      const limitVal = document.getElementById('inventoryEntriesPerPage').value;
+
+      let paginatedData = [];
+      let totalPages = 1;
+
+      if (limitVal === 'all') {
+        paginatedData = inventory;
+      } else {
+        const limit = parseInt(limitVal, 10);
+        totalPages = Math.ceil(inventory.length / limit) || 1;
+        if (inventoryCurrentPage > totalPages) inventoryCurrentPage = totalPages;
+        if (inventoryCurrentPage < 1) inventoryCurrentPage = 1;
+
+        const start = (inventoryCurrentPage - 1) * limit;
+        paginatedData = inventory.slice(start, start + limit);
+      }
+
+      // Update Info Text
+      const infoText = inventory.length === 0 ? 'Showing 0 to 0 of 0 entries' : 
+        limitVal === 'all' ? `Showing 1 to ${inventory.length} of ${inventory.length} entries` :
+        `Showing ${((inventoryCurrentPage - 1) * parseInt(limitVal)) + 1} to ${Math.min(inventoryCurrentPage * parseInt(limitVal), inventory.length)} of ${inventory.length} entries`;
+      document.getElementById('inventoryInfo').innerText = infoText;
+
+      // Render Pagination Buttons
+      const controlsDiv = document.getElementById('inventoryPaginationControls');
+      if (limitVal === 'all' || totalPages <= 1) {
+        controlsDiv.innerHTML = '';
+      } else {
+        let controlsHtml = `<button onclick="changeInventoryPage(${inventoryCurrentPage - 1})" ${inventoryCurrentPage === 1 ? 'disabled' : ''}>Prev</button>`;
+        for (let i = 1; i <= totalPages; i++) {
+          if (i === 1 || i === totalPages || (i >= inventoryCurrentPage - 1 && i <= inventoryCurrentPage + 1)) {
+            controlsHtml += `<button onclick="changeInventoryPage(${i})" ${inventoryCurrentPage === i ? 'style="background:var(--primary);color:#fff;border-color:var(--primary);"' : ''}>${i}</button>`;
+          } else if (i === inventoryCurrentPage - 2 || i === inventoryCurrentPage + 2) {
+            controlsHtml += `<span>...</span>`;
+          }
+        }
+        controlsHtml += `<button onclick="changeInventoryPage(${inventoryCurrentPage + 1})" ${inventoryCurrentPage === totalPages ? 'disabled' : ''}>Next</button>`;
+        controlsDiv.innerHTML = controlsHtml;
+      }
+
       if (inventory.length === 0) {
         body.innerHTML = '<tr><td colspan="12" style="text-align:center;">No inventory records available.</td></tr>';
         return;
       }
-      body.innerHTML = inventory.map(item => {
+
+      body.innerHTML = paginatedData.map(item => {
         const realIndex = inventory.indexOf(item);
         const markup = item.cost > 0 ? (((item.selling - item.cost) / item.cost) * 100).toFixed(1) : 0;
         const isLow = item.stock <= item.minStock;
@@ -1316,7 +1475,7 @@
 
     function exportInventoryExcel() {
       if (inventory.length === 0) { alert('No inventory data available to export.'); return; }
-      const excelData = inventory.log || inventory.map(item => {
+      const excelData = inventory.map(item => {
         const markup = item.cost > 0 ? (((item.selling - item.cost) / item.cost) * 100).toFixed(1) : 0;
         return {
           "Product ID": item.id, "Product Name": item.name, "Category": item.category,
